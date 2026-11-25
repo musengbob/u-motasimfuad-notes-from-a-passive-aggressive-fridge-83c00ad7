@@ -17,15 +17,44 @@ const GATE = {
   OUTPUT_FILE: "entry.txt",
 } as const;
 
-// The note itself, built by one function so the line and its gate travel
-// together: day 6 of guarding leftovers the owner binned untasted, and the
-// yogurt has been consulted.
+// The note, kept as its three beats so each clause can be read (and edited)
+// on its own; joined with single spaces, the line is exactly the entry.
+const NOTE_SEGMENTS = [
+  "Day 6 of guarding your leftovers.",
+  "You threw them out without even tasting them.",
+  "The yogurt and I have discussed this.",
+] as const;
+
 function buildEntryLine(): string {
-  return (
-    "Day 6 of guarding your leftovers. " +
-    "You threw them out without even tasting them. " +
-    "The yogurt and I have discussed this."
-  );
+  return NOTE_SEGMENTS.join(" ");
+}
+
+// Code points, not UTF-16 units or bytes: the gate counts characters.
+function countChars(text: string): number {
+  return [...text].length;
+}
+
+// Every gate condition from RULES.txt, collected as problems instead of
+// failing on the first one — so a bad entry reports everything wrong with it.
+function checkGate(line: string, readBack: string): string[] {
+  const problems: string[] = [];
+  const chars = countChars(readBack);
+
+  if (readBack !== line) {
+    problems.push("entry.txt is not byte-identical to the line.");
+  }
+  if (chars < GATE.MIN_CHARS || chars > GATE.MAX_CHARS) {
+    problems.push(
+      `${chars} characters, must be ${GATE.MIN_CHARS}-${GATE.MAX_CHARS}.`,
+    );
+  }
+  if (readBack.trim().length === 0) {
+    problems.push("line is only whitespace.");
+  }
+  if (readBack.includes("\n")) {
+    problems.push("entry must be a single line.");
+  }
+  return problems;
 }
 
 function resolveOutputDir(): string {
@@ -41,44 +70,34 @@ function resolveOutputDir(): string {
   return path.join(process.cwd(), "output");
 }
 
-// Every gate condition from RULES.txt, checked against the bytes actually
-// written — a mismatch fails loudly instead of shipping a bad entry.
-function validateEntry(line: string, readBack: string): void {
-  const codePoints = [...readBack].length;
-  const bytes = Buffer.byteLength(readBack, "utf8");
-
-  if (readBack !== line) {
-    throw new Error("Validation failed: entry.txt is not byte-identical to the line.");
-  }
-  if (codePoints < GATE.MIN_CHARS || codePoints > GATE.MAX_CHARS) {
-    throw new Error(
-      `Validation failed: ${codePoints} characters, must be ${GATE.MIN_CHARS}-${GATE.MAX_CHARS}.`,
-    );
-  }
-  if (readBack.trim().length === 0) {
-    throw new Error("Validation failed: line is only whitespace.");
-  }
-  if (readBack.includes("\n")) {
-    throw new Error("Validation failed: entry must be a single line.");
-  }
-
-  console.log(`Wrote ${codePoints} characters (${bytes} bytes) to ${path.join(resolveOutputDir(), GATE.OUTPUT_FILE)}:`);
-  console.log(readBack);
-  console.log(
-    `Validation passed: byte-identical, single line, within ${GATE.MIN_CHARS}-${GATE.MAX_CHARS} characters.`,
-  );
+// Write the line, read it back, and check the bytes actually written —
+// a mismatch fails loudly instead of shipping a bad entry.
+function writeEntry(line: string, outDir: string): string {
+  const outPath = path.join(outDir, GATE.OUTPUT_FILE);
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(outPath, line, "utf8");
+  return fs.readFileSync(outPath, "utf8");
 }
 
 function main(): void {
   const line = buildEntryLine();
   const outDir = resolveOutputDir();
-  fs.mkdirSync(outDir, { recursive: true });
+  const readBack = writeEntry(line, outDir);
 
-  const outPath = path.join(outDir, GATE.OUTPUT_FILE);
-  fs.writeFileSync(outPath, line, "utf8");
+  const problems = checkGate(line, readBack);
+  if (problems.length > 0) {
+    throw new Error(`Validation failed: ${problems.join(" ")}`);
+  }
 
-  const readBack = fs.readFileSync(outPath, "utf8");
-  validateEntry(line, readBack);
+  const chars = countChars(readBack);
+  const bytes = Buffer.byteLength(readBack, "utf8");
+  console.log(
+    `Wrote ${chars} characters (${bytes} bytes) to ${path.join(outDir, GATE.OUTPUT_FILE)}:`,
+  );
+  console.log(readBack);
+  console.log(
+    `Validation passed: byte-identical, single line, within ${GATE.MIN_CHARS}-${GATE.MAX_CHARS} characters.`,
+  );
 }
 
 main();
