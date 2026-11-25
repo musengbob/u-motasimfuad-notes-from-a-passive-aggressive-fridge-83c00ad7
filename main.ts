@@ -9,10 +9,24 @@ import * as path from "node:path";
 // the fridge is smug about its inventory, the grudge stays small and
 // domestic, and the joke trusts the reader instead of explaining itself.
 
-const LINE =
-  "Day 6 of guarding your leftovers. You threw them out without even tasting them. The yogurt and I have discussed this.";
+// The gate, sealed in RULES.txt: /output/entry.txt must be UTF-8 text of
+// 1 to 200 characters, not only whitespace, a single line.
+const GATE = {
+  MIN_CHARS: 1,
+  MAX_CHARS: 200,
+  OUTPUT_FILE: "entry.txt",
+} as const;
 
-const MAX_CHARS = 200;
+// The note itself, built by one function so the line and its gate travel
+// together: day 6 of guarding leftovers the owner binned untasted, and the
+// yogurt has been consulted.
+function buildEntryLine(): string {
+  return (
+    "Day 6 of guarding your leftovers. " +
+    "You threw them out without even tasting them. " +
+    "The yogurt and I have discussed this."
+  );
+}
 
 function resolveOutputDir(): string {
   if (process.env.MAKEFUN_OUTPUT_DIR && process.env.MAKEFUN_OUTPUT_DIR.trim() !== "") {
@@ -27,33 +41,44 @@ function resolveOutputDir(): string {
   return path.join(process.cwd(), "output");
 }
 
-const outDir = resolveOutputDir();
-fs.mkdirSync(outDir, { recursive: true });
+// Every gate condition from RULES.txt, checked against the bytes actually
+// written — a mismatch fails loudly instead of shipping a bad entry.
+function validateEntry(line: string, readBack: string): void {
+  const codePoints = [...readBack].length;
+  const bytes = Buffer.byteLength(readBack, "utf8");
 
-const outPath = path.join(outDir, "entry.txt");
-fs.writeFileSync(outPath, LINE, "utf8");
+  if (readBack !== line) {
+    throw new Error("Validation failed: entry.txt is not byte-identical to the line.");
+  }
+  if (codePoints < GATE.MIN_CHARS || codePoints > GATE.MAX_CHARS) {
+    throw new Error(
+      `Validation failed: ${codePoints} characters, must be ${GATE.MIN_CHARS}-${GATE.MAX_CHARS}.`,
+    );
+  }
+  if (readBack.trim().length === 0) {
+    throw new Error("Validation failed: line is only whitespace.");
+  }
+  if (readBack.includes("\n")) {
+    throw new Error("Validation failed: entry must be a single line.");
+  }
 
-const readBack = fs.readFileSync(outPath, "utf8");
-const codePoints = [...readBack].length;
-const bytes = Buffer.byteLength(readBack, "utf8");
-
-if (readBack !== LINE) {
-  console.error("Validation failed: entry.txt is not byte-identical to the line.");
-  process.exit(1);
-}
-if (codePoints < 1 || codePoints > MAX_CHARS) {
-  console.error(`Validation failed: ${codePoints} characters, must be 1-${MAX_CHARS}.`);
-  process.exit(1);
-}
-if (readBack.trim().length === 0) {
-  console.error("Validation failed: line is only whitespace.");
-  process.exit(1);
-}
-if (readBack.includes("\n")) {
-  console.error("Validation failed: entry must be a single line.");
-  process.exit(1);
+  console.log(`Wrote ${codePoints} characters (${bytes} bytes) to ${path.join(resolveOutputDir(), GATE.OUTPUT_FILE)}:`);
+  console.log(readBack);
+  console.log(
+    `Validation passed: byte-identical, single line, within ${GATE.MIN_CHARS}-${GATE.MAX_CHARS} characters.`,
+  );
 }
 
-console.log(`Wrote ${codePoints} characters (${bytes} bytes) to ${outPath}:`);
-console.log(readBack);
-console.log("Validation passed: byte-identical, single line, within 1-200 characters.");
+function main(): void {
+  const line = buildEntryLine();
+  const outDir = resolveOutputDir();
+  fs.mkdirSync(outDir, { recursive: true });
+
+  const outPath = path.join(outDir, GATE.OUTPUT_FILE);
+  fs.writeFileSync(outPath, line, "utf8");
+
+  const readBack = fs.readFileSync(outPath, "utf8");
+  validateEntry(line, readBack);
+}
+
+main();
