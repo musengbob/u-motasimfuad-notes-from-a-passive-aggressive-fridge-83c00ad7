@@ -79,6 +79,18 @@ function writeEntry(line: string, outDir: string): string {
   return fs.readFileSync(outPath, "utf8");
 }
 
+function reportEntry(line: string, readBack: string, outDir: string): void {
+  const chars = countChars(readBack);
+  const bytes = Buffer.byteLength(readBack, "utf8");
+  console.log(
+    `Wrote ${chars} characters (${bytes} bytes) to ${path.join(outDir, GATE.OUTPUT_FILE)}:`,
+  );
+  console.log(readBack);
+  console.log(
+    `Validation passed: byte-identical, single line, within ${GATE.MIN_CHARS}-${GATE.MAX_CHARS} characters.`,
+  );
+}
+
 function main(): void {
   const line = buildEntryLine();
   const outDir = resolveOutputDir();
@@ -89,15 +101,7 @@ function main(): void {
     throw new Error(`Validation failed: ${problems.join(" ")}`);
   }
 
-  const chars = countChars(readBack);
-  const bytes = Buffer.byteLength(readBack, "utf8");
-  console.log(
-    `Wrote ${chars} characters (${bytes} bytes) to ${path.join(outDir, GATE.OUTPUT_FILE)}:`,
-  );
-  console.log(readBack);
-  console.log(
-    `Validation passed: byte-identical, single line, within ${GATE.MIN_CHARS}-${GATE.MAX_CHARS} characters.`,
-  );
+  reportEntry(line, readBack, outDir);
 }
 
 main();
